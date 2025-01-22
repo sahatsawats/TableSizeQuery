@@ -53,29 +53,27 @@ func gracefulExit(statusCode int) {
 func main() {
 	// Parse option "--schema" when execute the binary
 	schema := flag.String("schema", "", "Provide the schema name")
-	
 	flag.Parse()
 	// Error handling when "--schema" is not specify
 	if *schema == "" {
-		fmt.Printf("No schema provided. User --schema to specify a file.")
-		gracefulExit(1)
+		fmt.Printf("No schema provided. Use --schema to specify a file. \n")
+		os.Exit(1)
 	}
 
 	//programStartTime := time.Now()
 	fmt.Println("Start reading configuration file...")
 	config := readingConfigurationsFile()
-
 	fmt.Println("Complete reading configuration file.")
-	fmt.Println("Starting logging thread...")
 
 	// Initialize logging
+	fmt.Println("Starting logging thread...")
 	logHandler, err := concurrentlog.NewLogger(config.Logger.LogFileName, 50)
-
 	if err != nil {
 		log.Fatalf("Failed to initialize log handler: %v", err)
 		gracefulExit(1)
 	}
 
+	// Map database credentails with 
 	databaseCredentials := &models.DatabaseCredentials{
 		DatabaseUser: config.Database.DatabaseUser,
 		DatabasePassword: config.Database.DatabasePassword,
@@ -98,9 +96,8 @@ func main() {
 		logHandler.Log("ERROR", fmt.Sprintf("Failed to open connection: %v", err))
 		gracefulExit(1)
 	}
-
 	
-	logHandler.Log("INFO", "Successfuly open connection.")
+	logHandler.Log("INFO", fmt.Sprintf("Successfully open connection to %v", databaseCredentials.ServiceName))
 
 	time.Sleep(time.Second * 5)
 	logHandler.Close()
