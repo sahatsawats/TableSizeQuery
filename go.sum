@@ -1,0 +1,8 @@
+github.com/sahatsawats/concurrent-log v1.1.0 h1:/5w7OZZFNJYj8aKHypcZtAD1mj35XSDSvfh5ZVyX+ow=
+github.com/sahatsawats/concurrent-log v1.1.0/go.mod h1:nbSfGzWa8YOSQN+6U/aZaaT+pJuk0uoahJnKqK3niVs=
+github.com/sijms/go-ora/v2 v2.8.23 h1:9k4VOty9Nv/Uy8aUqqO90DdRY5pDjKb+QnQ6uimZLiM=
+github.com/sijms/go-ora/v2 v2.8.23/go.mod h1:QgFInVi3ZWyqAiJwzBQA+nbKYKH77tdp1PYoCqhR2dU=
+gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405 h1:yhCVgyC4o1eVCa2tZl7eS0r+SDo693bJlVdllGtEeKM=
+gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
+gopkg.in/yaml.v2 v2.4.0 h1:D8xgwECY7CYvx+Y2n4sBz93Jn9JRvxdiyyo8CTfuKaY=
+gopkg.in/yaml.v2 v2.4.0/go.mod h1:RDklbk79AGWmwhnvt/jBztapEOGDOx6ZbXqjP6csGnQ=
