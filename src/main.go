@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-	_ "sync"
 	"time"
 
 	"github.com/sahatsawats/TableSizeQuery/src/models"
@@ -51,6 +50,20 @@ func gracefulExit(statusCode int) {
 	os.Exit(statusCode)
 }
 
+func flushingToDisk(results *concurrentqueue.ConcurrentQueue[models.CountRows], outputfile *os.File) {
+	for {
+		if results.IsEmpty() {
+			return
+		}
+		data := results.Dequeue()
+		line := fmt.Sprintf("%s,%d\n", data.TableName, data.Row)
+		_, err := outputfile.WriteString(line)
+		if err != nil {
+			fmt.Printf("Failed to write line: %s with error log: %v", line, err)
+		}
+	}
+}
+
 func main() {
 	// Parse option "--schema" when execute the binary
 	owner := flag.String("owner", "", "Provide the schema name")
@@ -74,6 +87,13 @@ func main() {
 		gracefulExit(1)
 	}
 
+	file, err := os.Create(config.Software.OutputFile)
+	if err != nil {
+		logHandler.Log("ERROR", fmt.Sprintf("Failed to create output file: %v", err))
+		gracefulExit(1)
+	}
+
+	defer file.Close()
 	// Map database credentails with 
 	databaseCredentials := &models.DatabaseCredentials{
 		DatabaseUser: config.Database.DatabaseUser,
@@ -127,6 +147,7 @@ func main() {
 	rows.Close()
 	db.Close()
 
+	logHandler.Log("INFO", "Starting query threads...")
 	var wg sync.WaitGroup
 	workerThreads := config.Software.WorkerThreads
 	// Create PrepareStatement to improve performance
@@ -171,13 +192,14 @@ func main() {
 				})
 			}
 		} (i, stmt)
-
-		wg.Wait()
 	}
 
+	wg.Wait()
+	logHandler.Log("INFO", "Completed query threads.")
 
-
-
+	logHandler.Log("INFO", "Flushing data...")
+	flushingToDisk(resultQueue, file)
+	logHandler.Log("INFO", "Flushing process is complete.")
 
 
 	time.Sleep(time.Second * 5)
