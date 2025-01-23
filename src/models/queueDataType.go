@@ -1,7 +1,6 @@
 package models
 
-type CountRows struct {
+type QueueDataType struct {
 	Owner string
 	TableName string
-	Row int64
 }

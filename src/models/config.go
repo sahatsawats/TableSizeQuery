@@ -12,6 +12,7 @@ package models
 		HostName string
 		Port int
 		ServiceName string
+		ExcludeOwner string
 	}
 
 	type LoggerConfigurations struct {
