@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -45,18 +46,35 @@ func readingConfigurationsFile() *models.Configurations {
 	return &conf
 }
 
+// TODO: Delete the given single qoutes and whitespace from configuration file (FINISHED) 24/01/2025
+// readStringToList returns a slice of string without single qoutes or white-space.
+func readStringToList(text string) []string {
+	// Replace single qoutes
+	deleteSingleQoutes := strings.ReplaceAll(text, "'", "")
+	// Split by comma delimiter
+	splitString := strings.Split(deleteSingleQoutes, ",")
+	// for-loop trim the white-space
+	for i := range splitString {
+		splitString[i] = strings.TrimSpace(splitString[i])
+	}
+
+	return splitString
+}
+
+// gracefulExit used for delays the error exit for concurrentlog can flush all of logs in buffer to disk.
 func gracefulExit(statusCode int) {
 	time.Sleep(3 * time.Second)
 	os.Exit(statusCode)
 }
 
+// flusingToDisk used for dequeue the results from query to output file.
 func flushingToDisk(results *concurrentqueue.ConcurrentQueue[models.CountRows], outputfile *os.File) {
 	for {
 		if results.IsEmpty() {
 			return
 		}
 		data := results.Dequeue()
-		line := fmt.Sprintf("%s,%d\n", data.TableName, data.Row)
+		line := fmt.Sprintf("%s,%s,%d\n", data.Owner, data.TableName, data.Row)
 		_, err := outputfile.WriteString(line)
 		if err != nil {
 			fmt.Printf("Failed to write line: %s with error log: %v", line, err)
@@ -64,17 +82,26 @@ func flushingToDisk(results *concurrentqueue.ConcurrentQueue[models.CountRows], 
 	}
 }
 
+// buildQueryStatement used for create a query statement to find a owner and tables name.
+// A excludeOwner is a slice of string that use for filter out owner name.
+func buildQueryStatement(excludeOwner []string) string {
+	var sb strings.Builder
+	sizeOfExcludeOwner := len(excludeOwner)
+	sb.WriteString("SELECT owner, table_name FROM dba_tables WHERE owner NOT IN (")
+	for i := 0; i < sizeOfExcludeOwner; i++ {
+		if i+1 == sizeOfExcludeOwner {
+			sb.WriteString(fmt.Sprintf("'%s')",excludeOwner[i]))
+		} else {
+			sb.WriteString(fmt.Sprintf("'%s',", excludeOwner[i]))
+		}
+	}
+	return sb.String()
+}
+
 func main() {
-	// Parse option "--schema" when execute the binary
-	owner := flag.String("owner", "", "Provide the schema name")
 	timeOut := flag.Int64("timeout", 180, "timeout for query")
 	flag.Parse()
-	// Error handling when "--schema" is not specify
-	if *owner == "" {
-		fmt.Printf("No schema provided. Use --owner to specify a file. \n")
-		os.Exit(1)
-	}
-
+	
 	// programStartTime := time.Now()
 	fmt.Println("Start reading configuration file...")
 	config := readingConfigurationsFile()
@@ -95,15 +122,15 @@ func main() {
 	}
 
 	defer file.Close()
-	// Map database credentails with 
+	// Map database credentails with
 	databaseCredentials := &models.DatabaseCredentials{
-		DatabaseUser: config.Database.DatabaseUser,
+		DatabaseUser:     config.Database.DatabaseUser,
 		DatabasePassword: config.Database.DatabasePassword,
-		ServiceName: config.Database.ServiceName,
-		HostName: config.Database.HostName,
-		Port: config.Database.Port,
+		ServiceName:      config.Database.ServiceName,
+		HostName:         config.Database.HostName,
+		Port:             config.Database.Port,
 	}
-	
+
 	connectionString := databaseCredentials.GetConnectionString(*timeOut)
 	logHandler.Log("INFO", fmt.Sprintf("Establish connection to %v", databaseCredentials.ServiceName))
 	// Open connection to oracle database based on given credentials with oracle driver
@@ -124,32 +151,40 @@ func main() {
 	// Set connection pool settings
 	db.SetMaxOpenConns(0)
 	db.SetMaxIdleConns(config.Software.WorkerThreads)
-	
+
 	// Query all tables from given owner
-	rows, err := db.Query(fmt.Sprintf("SELECT table_name FROM dba_tables WHERE owner = '%s'", *owner))
+	excludeOwner := readStringToList(config.Database.ExcludeOwner)
+	queryStatement := buildQueryStatement(excludeOwner)
+
+	rows, err := db.Query(queryStatement)
 	if err != nil {
 		logHandler.Log("ERROR", fmt.Sprintf("Failed to execute query list all tables from dba_tables: %v", err))
 		gracefulExit(1)
 	}
-
+	//TODO: Enqueue with owner name as well as table_name (FINISHED) 24/01/2025
 	// Concurrent Queue, purpose is for multiple goroutine to dequeue the data.
-	queue := concurrentqueue.New[string]()
+	queue := concurrentqueue.New[models.QueueDataType]()
 	enqueueOk := 0
 	enqueueNok := 0
 	for rows.Next() {
+		var owner_name string
 		var table_name string
-		err := rows.Scan(&table_name)
+		err := rows.Scan(&owner_name, &table_name)
 		if err != nil {
 			// If error occured, logging and skip to the next.
 			logHandler.Log("ERROR", fmt.Sprintf("Failed to read results from query: %v", err))
 			enqueueNok = enqueueNok + 1
 			continue
 		}
-		queue.Enqueue(table_name)
+		enqueueDataType := models.QueueDataType{
+			Owner: owner_name,
+			TableName: table_name,
+		}
+		queue.Enqueue(enqueueDataType)
 		enqueueOk = enqueueOk + 1
 	}
 
-	logHandler.Log("INFO", fmt.Sprintf("Complete enqueue table name within owner='%v' with status {ok: %d, nok: %d}", *owner, enqueueOk, enqueueNok))
+	logHandler.Log("INFO", fmt.Sprintf("Complete enqueue table name with status {ok: %d, nok: %d}", enqueueOk, enqueueNok))
 	rows.Close()
 
 	logHandler.Log("INFO", "Starting query threads...")
@@ -168,21 +203,22 @@ func main() {
 				if queue.IsEmpty() {
 					return
 				}
-
-				tableName := queue.Dequeue()
-
-				var rowCount int64 
-				err := db.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM %s", tableName)).Scan(&rowCount)
+				// TODO: Change from single table name to full-table name (with owner), change results enqueue to write into output file (FINISHED) 24/01/2025
+				queueDataType := queue.Dequeue()
+				fullNameTable := fmt.Sprintf("%s.%s", queueDataType.Owner, queueDataType.TableName)
+				var rowCount int64
+				err := db.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM %s", fullNameTable)).Scan(&rowCount)
 				if err != nil {
-					logHandler.Log("ERROR", fmt.Sprintf("Failed to read results from %s: %v", tableName, err))
+					logHandler.Log("ERROR", fmt.Sprintf("Failed to read results from %s: %v", fullNameTable, err))
 				}
 
 				resultQueue.Enqueue(models.CountRows{
-					TableName: tableName,
-					Row: rowCount,
+					Owner: queueDataType.Owner,
+					TableName: queueDataType.TableName,
+					Row:       rowCount,
 				})
 			}
-		} (i)
+		}(i)
 	}
 
 	wg.Wait()
