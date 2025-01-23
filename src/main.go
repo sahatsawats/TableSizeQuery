@@ -19,6 +19,8 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+// TODO: specify service name by passing args. If passing args, ignore parameter in config files
+
 // Reading configuration file
 func readingConfigurationsFile() *models.Configurations {
 	// get the current execute directory
@@ -102,7 +104,7 @@ func main() {
 	timeOut := flag.Int64("timeout", 180, "timeout for query")
 	flag.Parse()
 	
-	// programStartTime := time.Now()
+	programStartTime := time.Now()
 	fmt.Println("Start reading configuration file...")
 	config := readingConfigurationsFile()
 	fmt.Println("Complete reading configuration file.")
@@ -222,11 +224,12 @@ func main() {
 	}
 
 	wg.Wait()
-	logHandler.Log("INFO", "Completed query threads.")
-
+	logHandler.Log("INFO", "Completed query threads.")	
 	logHandler.Log("INFO", "Flushing data...")
 	flushingToDisk(resultQueue, file)
 	logHandler.Log("INFO", "Flushing process is complete.")
+	elapsedTime := time.Since(programStartTime)
+	logHandler.Log("INFO", fmt.Sprintf("Script successfully executed with elapsed time: %v", elapsedTime))
 
 	time.Sleep(time.Second * 5)
 	logHandler.Close()
