@@ -1,6 +1,8 @@
 package models
 
 import (
+	"fmt"
+
 	go_ora "github.com/sijms/go-ora/v2"
 )
 
@@ -12,7 +14,9 @@ type DatabaseCredentials struct {
 	Port int
 }
 
-func (d DatabaseCredentials) GetConnectionString() string {
-	
-	return go_ora.BuildUrl(d.HostName, d.Port, d.ServiceName, d.DatabaseUser, d.DatabasePassword, nil)
+func (d DatabaseCredentials) GetConnectionString(timeout int64) string {
+	urlOptions := map[string]string {
+		"TIMEOUT": fmt.Sprintf("%d",timeout),
+	}
+	return go_ora.BuildUrl(d.HostName, d.Port, d.ServiceName, d.DatabaseUser, d.DatabasePassword, urlOptions)
 }
