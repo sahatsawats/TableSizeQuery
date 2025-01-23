@@ -149,7 +149,7 @@ func main() {
 		enqueueOk = enqueueOk + 1
 	}
 
-	logHandler.Log("INFO", fmt.Sprintf("Complete enqueue table name within owner='%v' with status {ok: %d, nok: %d}", owner, enqueueOk, enqueueNok))
+	logHandler.Log("INFO", fmt.Sprintf("Complete enqueue table name within owner='%v' with status {ok: %d, nok: %d}", *owner, enqueueOk, enqueueNok))
 	rows.Close()
 
 	logHandler.Log("INFO", "Starting query threads...")
