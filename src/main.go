@@ -67,14 +67,15 @@ func flushingToDisk(results *concurrentqueue.ConcurrentQueue[models.CountRows], 
 func main() {
 	// Parse option "--schema" when execute the binary
 	owner := flag.String("owner", "", "Provide the schema name")
+	timeOut := flag.Int64("timeout", 180, "timeout for query")
 	flag.Parse()
 	// Error handling when "--schema" is not specify
 	if *owner == "" {
-		fmt.Printf("No schema provided. Use --schema to specify a file. \n")
+		fmt.Printf("No schema provided. Use --owner to specify a file. \n")
 		os.Exit(1)
 	}
 
-	//programStartTime := time.Now()
+	// programStartTime := time.Now()
 	fmt.Println("Start reading configuration file...")
 	config := readingConfigurationsFile()
 	fmt.Println("Complete reading configuration file.")
@@ -103,7 +104,7 @@ func main() {
 		Port: config.Database.Port,
 	}
 	
-	connectionString := databaseCredentials.GetConnectionString()
+	connectionString := databaseCredentials.GetConnectionString(*timeOut)
 	logHandler.Log("INFO", fmt.Sprintf("Establish connection to %v", databaseCredentials.ServiceName))
 	// Open connection to oracle database based on given credentials with oracle driver
 	db, err := sql.Open("oracle", connectionString)
@@ -111,6 +112,7 @@ func main() {
 		logHandler.Log("ERROR", fmt.Sprintf("Cannot create connection: %v", err))
 		gracefulExit(1)
 	}
+	defer db.Close()
 	// Test connection due to lazy
 	err = db.Ping()
 	if err != nil {
@@ -119,8 +121,12 @@ func main() {
 	}
 	logHandler.Log("INFO", fmt.Sprintf("Successfully open connection to %v", databaseCredentials.ServiceName))
 
+	// Set connection pool settings
+	db.SetMaxOpenConns(0)
+	db.SetMaxIdleConns(config.Software.WorkerThreads)
+	
 	// Query all tables from given owner
-	rows, err := db.Query(fmt.Sprintf("SELECT table_name FROM dba_tables WHERE owner = '%d'", owner))
+	rows, err := db.Query(fmt.Sprintf("SELECT table_name FROM dba_tables WHERE owner = '%s'", *owner))
 	if err != nil {
 		logHandler.Log("ERROR", fmt.Sprintf("Failed to execute query list all tables from dba_tables: %v", err))
 		gracefulExit(1)
@@ -145,43 +151,28 @@ func main() {
 
 	logHandler.Log("INFO", fmt.Sprintf("Complete enqueue table name within owner='%v' with status {ok: %d, nok: %d}", owner, enqueueOk, enqueueNok))
 	rows.Close()
-	db.Close()
 
 	logHandler.Log("INFO", "Starting query threads...")
 	var wg sync.WaitGroup
 	workerThreads := config.Software.WorkerThreads
 	// Create PrepareStatement to improve performance
-	stmt, err := db.Prepare("SELECT COUNT(*) FROM ?")
-	if err != nil {
-		logHandler.Log("ERROR", fmt.Sprintf("Failed to create prepareStatement: %v", err))
-	}
-	defer stmt.Close()
+
 	// resultQueue: use for stored query results
 	resultQueue := concurrentqueue.New[models.CountRows]()
 
 	for i := 0; i < workerThreads; i++ {
 		wg.Add(1)
-		go func(id int, preapreStatement *sql.Stmt) {
+		go func(id int) {
 			defer wg.Done()
-			db, err := sql.Open("oracle", connectionString)
-			if err != nil {
-				logHandler.Log("ERROR", fmt.Sprintf("Failed to create connection from worker %d: %v", id, err))
-			}
-			defer db.Close()
-
-			err = db.Ping()
-			if err != nil {
-				logHandler.Log("ERROR", fmt.Sprintf("Failed to open connection from worker %d: %v", id, err))
-			}
-
 			for {
 				if queue.IsEmpty() {
 					return
 				}
 
 				tableName := queue.Dequeue()
+
 				var rowCount int64 
-				err := stmt.QueryRow(tableName).Scan(&rowCount)
+				err := db.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM %s", tableName)).Scan(&rowCount)
 				if err != nil {
 					logHandler.Log("ERROR", fmt.Sprintf("Failed to read results from %s: %v", tableName, err))
 				}
@@ -191,7 +182,7 @@ func main() {
 					Row: rowCount,
 				})
 			}
-		} (i, stmt)
+		} (i)
 	}
 
 	wg.Wait()
@@ -200,7 +191,6 @@ func main() {
 	logHandler.Log("INFO", "Flushing data...")
 	flushingToDisk(resultQueue, file)
 	logHandler.Log("INFO", "Flushing process is complete.")
-
 
 	time.Sleep(time.Second * 5)
 	logHandler.Close()
