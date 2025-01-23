@@ -223,11 +223,16 @@ func main() {
 		}(i)
 	}
 
+	// Waiting goroutine to be finish
 	wg.Wait()
-	logHandler.Log("INFO", "Completed query threads.")	
+	logHandler.Log("INFO", "Completed query threads.")
+
+	// Flush the query from buffer to output file
 	logHandler.Log("INFO", "Flushing data...")
 	flushingToDisk(resultQueue, file)
 	logHandler.Log("INFO", "Flushing process is complete.")
+
+	// Close the proccesses
 	elapsedTime := time.Since(programStartTime)
 	logHandler.Log("INFO", fmt.Sprintf("Script successfully executed with elapsed time: %v", elapsedTime))
 
