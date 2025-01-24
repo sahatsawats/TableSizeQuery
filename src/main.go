@@ -111,13 +111,13 @@ func main() {
 
 	// Initialize logging
 	fmt.Println("Starting logging thread...")
-	logHandler, err := concurrentlog.NewLogger(config.Logger.LogFileName, 50)
+	logHandler, err := concurrentlog.NewLogger(config.Logger.LogFile_Name, 50)
 	if err != nil {
 		log.Fatalf("Failed to initialize log handler: %v", err)
 		gracefulExit(1)
 	}
 
-	file, err := os.Create(config.Software.OutputFile)
+	file, err := os.Create(config.Software.Output_File)
 	if err != nil {
 		logHandler.Log("ERROR", fmt.Sprintf("Failed to create output file: %v", err))
 		gracefulExit(1)
@@ -126,10 +126,10 @@ func main() {
 	defer file.Close()
 	// Map database credentails with
 	databaseCredentials := &models.DatabaseCredentials{
-		DatabaseUser:     config.Database.DatabaseUser,
-		DatabasePassword: config.Database.DatabasePassword,
-		ServiceName:      config.Database.ServiceName,
-		HostName:         config.Database.HostName,
+		DatabaseUser:     config.Database.Database_User,
+		DatabasePassword: config.Database.Database_Password,
+		ServiceName:      config.Database.Service_Name,
+		HostName:         config.Database.Host_Name,
 		Port:             config.Database.Port,
 	}
 
@@ -152,10 +152,10 @@ func main() {
 
 	// Set connection pool settings
 	db.SetMaxOpenConns(0)
-	db.SetMaxIdleConns(config.Software.WorkerThreads)
+	db.SetMaxIdleConns(config.Software.Worker_Threads)
 
 	// Query all tables from given owner
-	excludeOwner := readStringToList(config.Database.ExcludeOwner)
+	excludeOwner := readStringToList(config.Database.Exclude_Owner)
 	queryStatement := buildQueryStatement(excludeOwner)
 
 	rows, err := db.Query(queryStatement)
@@ -191,7 +191,7 @@ func main() {
 
 	logHandler.Log("INFO", "Starting query threads...")
 	var wg sync.WaitGroup
-	workerThreads := config.Software.WorkerThreads
+	workerThreads := config.Software.Worker_Threads
 	// Create PrepareStatement to improve performance
 
 	// resultQueue: use for stored query results
