@@ -14,7 +14,7 @@ func TestNormalReadStringToList(t *testing.T) {
 	}
 }
 
-func TestSingleQoutesReadStringToList(t *testing.T) {
+func TestSinglequotesReadStringToList(t *testing.T) {
 	target := []string{"system1", "system2", "system3"}
 	output := readStringToList("'system1','system2','system3'")
 
@@ -23,7 +23,7 @@ func TestSingleQoutesReadStringToList(t *testing.T) {
 	}
 }
 
-func TestTrimSingleQoutesReadStringToList(t *testing.T) {
+func TestTrimSinglequotesReadStringToList(t *testing.T) {
 	target := []string{"system1", "system2", "system3"}
 	output := readStringToList("'system1', 'system2', 'system3'")
 

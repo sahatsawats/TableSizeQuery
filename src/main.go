@@ -48,13 +48,13 @@ func readingConfigurationsFile() *models.Configurations {
 	return &conf
 }
 
-// TODO: Delete the given single qoutes and whitespace from configuration file (FINISHED) 24/01/2025
-// readStringToList returns a slice of string without single qoutes or white-space.
+// TODO: Delete the given single quotes and whitespace from configuration file (FINISHED) 24/01/2025
+// readStringToList returns a slice of string without single quotes or white-space.
 func readStringToList(text string) []string {
-	// Replace single qoutes
-	deleteSingleQoutes := strings.ReplaceAll(text, "'", "")
+	// Replace single quotes
+	deleteSinglequotes := strings.ReplaceAll(text, "'", "")
 	// Split by comma delimiter
-	splitString := strings.Split(deleteSingleQoutes, ",")
+	splitString := strings.Split(deleteSinglequotes, ",")
 	// for-loop trim the white-space
 	for i := range splitString {
 		splitString[i] = strings.TrimSpace(splitString[i])
