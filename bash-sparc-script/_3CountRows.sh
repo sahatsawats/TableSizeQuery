@@ -3,17 +3,25 @@
 
 # Database connection parameters
 USER="uthai888"
-PASS="oracle4u"
-SRV="PNEWNMDB_PREFER1"
+PASS="oracle123"
+SRV="PPAYDB"
+
+# Check if the input file argument is provided
+if [[ -z "$1" ]]; then
+  echo "Usage: $0 <input_file>"
+  exit 1
+fi
 
 # Input file containing OWNER.TABLE_NAME
-INPUT_FILE="tables_with_owners.txt"
+INPUT_FILE=$1
 
 # Output CSV file
 OUTPUT_CSV="table_row_counts.csv"
 
 # Write the CSV header
 echo "Owner,Table Name,Row Count" > "$OUTPUT_CSV"
+# Capture start time
+START_TIME=$(perl -e 'print time')
 
 # Read each line from the input file and query row count
 while IFS= read -r table; do
@@ -42,5 +50,12 @@ EOF
   
 done < "$INPUT_FILE"
 
+# Get the end time (in seconds) using Perl
+END_TIME=$(perl -e 'print time')
+
+# Calculate the elapsed time
+ELAPSED_TIME=$((END_TIME - START_TIME))
+
+
 # Output message
-echo "Row counts saved to $OUTPUT_CSV."
+echo "Row counts saved to $OUTPUT_CSV with $ELAPSED_TIME seconds"

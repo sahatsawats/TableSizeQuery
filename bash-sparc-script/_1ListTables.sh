@@ -19,7 +19,7 @@ EXCLUDED_OWNERS="'REMOTE_SCHEDULER_AGENT','OJVMSYS','GSMADMIN_INTERNAL','DVSYS',
 # Output file
 OUTPUT_FILE="tables_with_owners.txt"
 # Capture start time
-START_TIME=$(date +%s)
+START_TIME=$(perl -e 'print time')
 
 # SQL query to fetch table names and owners, excluding specified owners
 SQL_QUERY="SELECT owner || '.' || table_name FROM all_tables WHERE owner NOT IN ($EXCLUDED_OWNERS) ORDER BY owner, table_name;"
@@ -38,5 +38,12 @@ SPOOL $OUTPUT_FILE
 $SQL_QUERY
 SPOOL OFF
 EOF
+
+
+# Get the end time (in seconds) using Perl
+END_TIME=$(perl -e 'print time')
+
+# Calculate the elapsed time
+ELAPSED_TIME=$((END_TIME - START_TIME))
 
 echo "Query completed in $ELAPSED_TIME seconds. Results saved in $OUTPUT_FILE."
