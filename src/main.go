@@ -101,7 +101,8 @@ func buildQueryStatement(excludeOwner []string) string {
 }
 
 func main() {
-	timeOut := flag.Int64("timeout", 180, "timeout for query")
+	timeOut := flag.Int64("timeout", 0, "timeout for query")
+
 	flag.Parse()
 	
 	programStartTime := time.Now()
@@ -153,6 +154,7 @@ func main() {
 	// Set connection pool settings
 	db.SetMaxOpenConns(0)
 	db.SetMaxIdleConns(config.Software.Worker_Threads)
+	db.SetConnMaxLifetime(0)
 
 	// Query all tables from given owner
 	excludeOwner := readStringToList(config.Database.Exclude_Owner)
@@ -207,7 +209,8 @@ func main() {
 				}
 				// TODO: Change from single table name to full-table name (with owner), change results enqueue to write into output file (FINISHED) 24/01/2025
 				queueDataType := queue.Dequeue()
-				fullNameTable := fmt.Sprintf("%s.%s", queueDataType.Owner, queueDataType.TableName)
+				// ! Include double-quotes between owner and table name (FINISHED) 24/01/2025
+				fullNameTable := fmt.Sprintf("\"%s\".\"%s\"", queueDataType.Owner, queueDataType.TableName)
 				var rowCount int64
 				err := db.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM %s", fullNameTable)).Scan(&rowCount)
 				if err != nil {
