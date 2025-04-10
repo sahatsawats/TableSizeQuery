@@ -2,24 +2,31 @@
 
 
 # Database connection parameters
-USER="uthai888"
-PASS="oracle123"
-SRV="PPAYDB"
+USER=""
+PASS=""
+SRV=""
+INPUT_FILE=""
+# Parse options
+while getopts "u:s:f:p:" opt; do
+  case "$opt" in
+    u) USER="$OPTARG" ;;
+    s) SRV="$OPTARG" ;;
+    p) PASS="$OPTARG" ;;
+    f) INPUT_FILE="$OPTARG";;
+    *) echo "Usage: $0 -u <user> -s <server> -p <password>" >&2; exit 1 ;;
+  esac
+done
 
-# Check if the input file argument is provided
-if [[ -z "$1" ]]; then
-  echo "Usage: $0 <input_file>"
+if [[ -z "$USER" || -z "$SRV" || -z "$PASS" || -z "$INPUT_FILE" ]]; then
+  echo "Error: All options -u, -s, -f,and -p are required." >&2
+  echo "Usage: $0 -u <user> -s <service> -p <password> -f <file>" >&2
   exit 1
 fi
 
-# Input file containing OWNER.TABLE_NAME
-INPUT_FILE=$1
 
 # Output CSV file
 OUTPUT_CSV="table_row_counts.csv"
 
-# Write the CSV header
-echo "Owner,Table Name,Row Count" > "$OUTPUT_CSV"
 # Capture start time
 START_TIME=$(perl -e 'print time')
 
@@ -30,7 +37,7 @@ while IFS= read -r table; do
   TABLE_NAME=$(echo $table | cut -d '.' -f 2)
 
   # SQL query to count rows in the table
-  SQL_QUERY="SELECT COUNT(*) FROM $OWNER.$TABLE_NAME;"
+  SQL_QUERY="SELECT /*+ parallel(10) */ COUNT(*) FROM $OWNER.$TABLE_NAME;"
 
   # Run the SQL query and capture the result
   ROW_COUNT=$(sqlplus -s $USER/$PASS@$SRV <<EOF
